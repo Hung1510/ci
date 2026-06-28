@@ -1,0 +1,76 @@
+name: ci
+
+# self-contained universal pipeline. no central repo needed.
+# pick your stack by uncommenting the matching lines in the two EDIT blocks.
+# everything outside those blocks is the same in every repo.
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      # ===== EDIT: build + test for your stack (uncomment one) ==========
+      # --- Go ---
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+      - run: go vet ./...
+      - run: go test ./...
+      # --- C++ / mingw (static win32) ---
+      # - run: sudo apt-get update && sudo apt-get install -y g++-mingw-w64-x86-64
+      # - run: x86_64-w64-mingw32-g++ -static -O2 -o app.exe *.cpp -lwinmm
+      # --- Node ---
+      # - uses: actions/setup-node@v4
+      #   with:
+      #     node-version: 'lts/*'
+      #     cache: 'npm'
+      # - run: npm ci
+      # - run: npm test
+      # --- Python ---
+      # - uses: actions/setup-python@v5
+      #   with:
+      #     python-version: '3.x'
+      # - run: pip install -e .[test]
+      # - run: pytest
+      # --- Bash / Rainmeter ---
+      # - run: sudo apt-get update && sudo apt-get install -y shellcheck
+      # - run: shellcheck *.sh
+      # =================================================================
+
+  release:
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v6
+
+      # ===== EDIT: produce your release artifact (uncomment one) ========
+      # --- Go (static windows exe) ---
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+      - run: GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o app.exe .
+      # --- C++ / mingw ---
+      # - run: sudo apt-get update && sudo apt-get install -y g++-mingw-w64-x86-64
+      # - run: x86_64-w64-mingw32-g++ -static -O2 -o app.exe *.cpp -lwinmm
+      # --- Bash / Rainmeter ---
+      # - run: bash package.sh
+      # =================================================================
+
+      - uses: softprops/action-gh-release@v3
+        with:
+          files: app.exe          # EDIT: your output file(s), newline-separated
+          generate_release_notes: true

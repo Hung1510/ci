@@ -1,0 +1,19 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+    branches: [main]
+
+jobs:
+  ci:
+    uses: Hung1510/ci/.github/workflows/go-release.yml@v1
+    permissions:
+      contents: write
+    with:
+      binary: weatherfetch
+      # main-path: "."
+      # build for multiple platforms by passing a JSON array:
+      # targets: '[{"goos":"windows","goarch":"amd64"},{"goos":"linux","goarch":"amd64"},{"goos":"darwin","goarch":"arm64"}]'

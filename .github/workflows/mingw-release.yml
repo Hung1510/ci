@@ -1,0 +1,57 @@
+name: mingw-release
+
+# reusable workflow for native windows tools cross-compiled with mingw.
+# mirrors your local x86_64-w64-mingw32-g++ build, run on the runner.
+on:
+  workflow_call:
+    inputs:
+      binary:
+        description: 'base name of the output exe, e.g. startup_voice'
+        required: true
+        type: string
+      sources:
+        description: 'source files to compile (glob ok), e.g. src/*.cpp'
+        required: false
+        default: '*.cpp'
+        type: string
+      libs:
+        description: 'extra link libraries, e.g. -lwinmm'
+        required: false
+        default: ''
+        type: string
+      flags:
+        description: 'compiler flags'
+        required: false
+        default: '-static -O2'
+        type: string
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - name: install mingw
+        run: sudo apt-get update && sudo apt-get install -y g++-mingw-w64-x86-64
+      - name: compile
+        run: x86_64-w64-mingw32-g++ ${{ inputs.flags }} -o ${{ inputs.binary }}.exe ${{ inputs.sources }} ${{ inputs.libs }}
+
+  release:
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v6
+      - name: install mingw
+        run: sudo apt-get update && sudo apt-get install -y g++-mingw-w64-x86-64
+      - name: compile and hash
+        run: |
+          x86_64-w64-mingw32-g++ ${{ inputs.flags }} -o ${{ inputs.binary }}.exe ${{ inputs.sources }} ${{ inputs.libs }}
+          sha256sum ${{ inputs.binary }}.exe > ${{ inputs.binary }}.exe.sha256
+      - uses: softprops/action-gh-release@v3
+        with:
+          files: |
+            ${{ inputs.binary }}.exe
+            ${{ inputs.binary }}.exe.sha256
+          generate_release_notes: true

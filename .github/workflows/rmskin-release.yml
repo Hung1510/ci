@@ -1,0 +1,50 @@
+name: rmskin-release
+
+# reusable workflow for rainmeter suites: lint the shell scripts,
+# build the .rmskin as a check, and attach it on a tag.
+on:
+  workflow_call:
+    inputs:
+      package-script:
+        description: 'script that builds the .rmskin'
+        required: false
+        default: 'package.sh'
+        type: string
+      artifact:
+        description: 'glob for the packaged output to upload'
+        required: false
+        default: '*.rmskin'
+        type: string
+      shellcheck-glob:
+        description: 'which scripts to lint; set to "" to skip linting'
+        required: false
+        default: '*.sh'
+        type: string
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - name: shellcheck
+        if: inputs.shellcheck-glob != ''
+        run: |
+          sudo apt-get update && sudo apt-get install -y shellcheck
+          shellcheck ${{ inputs.shellcheck-glob }}
+      - name: build package
+        run: bash ${{ inputs.package-script }}
+
+  release:
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v6
+      - name: build package
+        run: bash ${{ inputs.package-script }}
+      - uses: softprops/action-gh-release@v3
+        with:
+          files: ${{ inputs.artifact }}
+          generate_release_notes: true

@@ -1,0 +1,67 @@
+name: go-release
+
+# reusable workflow -> other repos call this, they don't copy it.
+# build+test runs on every call; release runs only on a v* tag.
+on:
+  workflow_call:
+    inputs:
+      binary:
+        description: 'base name of the output binary, e.g. weatherfetch'
+        required: true
+        type: string
+      main-path:
+        description: 'path to the main package'
+        required: false
+        default: '.'
+        type: string
+      targets:
+        description: 'JSON array of build targets; default is windows/amd64 only'
+        required: false
+        default: '[{"goos":"windows","goarch":"amd64"}]'
+        type: string
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+      - run: go mod verify
+      - run: go vet ./...
+      - run: go test ./...
+      - run: go build ./...
+
+  release:
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    strategy:
+      matrix:
+        target: ${{ fromJSON(inputs.targets) }}
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+      - name: build artifact
+        env:
+          GOOS: ${{ matrix.target.goos }}
+          GOARCH: ${{ matrix.target.goarch }}
+          CGO_ENABLED: '0'
+        run: |
+          ext=""
+          [ "$GOOS" = "windows" ] && ext=".exe"
+          out="${{ inputs.binary }}-${GOOS}-${GOARCH}${ext}"
+          go build -trimpath -ldflags="-s -w" -o "$out" "${{ inputs.main-path }}"
+          sha256sum "$out" > "$out.sha256"
+          echo "ASSET=$out" >> "$GITHUB_ENV"
+      - uses: softprops/action-gh-release@v3
+        with:
+          files: |
+            ${{ env.ASSET }}
+            ${{ env.ASSET }}.sha256
+          generate_release_notes: true

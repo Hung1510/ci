@@ -1,0 +1,19 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+    branches: [main]
+
+jobs:
+  ci:
+    uses: Hung1510/ci/.github/workflows/mingw-release.yml@v1
+    permissions:
+      contents: write
+    with:
+      binary: startup_voice
+      sources: 'src/*.cpp'
+      libs: '-lwinmm'
+      # flags: '-static -O2'
